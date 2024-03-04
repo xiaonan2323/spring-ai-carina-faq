@@ -2,14 +2,17 @@ package com.example.carina.qa;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.client.AiClient;
-import org.springframework.ai.client.AiResponse;
+
+import org.springframework.ai.chat.ChatClient;
+import org.springframework.ai.chat.ChatResponse;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.chat.prompt.SystemPromptTemplate;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.prompt.Prompt;
-import org.springframework.ai.prompt.SystemPromptTemplate;
-import org.springframework.ai.prompt.messages.Message;
-import org.springframework.ai.prompt.messages.UserMessage;
-import org.springframework.ai.retriever.VectorStoreRetriever;
+
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
@@ -30,14 +33,17 @@ public class QAService {
     @Value("classpath:/prompts/system-chatbot.st")
     private Resource chatbotSystemPromptResource;
 
-    private final AiClient aiClient;
+    private final ChatClient chatClient;
 
-    private final VectorStoreRetriever vectorStoreRetriever;
+    private final VectorStore vectorStore;
+
+    private final SearchRequest searchRequest;
 
     @Autowired
-    public QAService(AiClient aiClient, VectorStoreRetriever vectorStoreRetriever) {
-        this.aiClient = aiClient;
-        this.vectorStoreRetriever = vectorStoreRetriever;
+    public QAService(ChatClient chatClient, VectorStore vectorStore, SearchRequest searchRequest) {
+        this.chatClient = chatClient;
+        this.vectorStore = vectorStore;
+        this.searchRequest = searchRequest;
     }
 
     public String generate(String message, boolean stuffit) {
@@ -46,15 +52,16 @@ public class QAService {
         Prompt prompt = new Prompt(List.of(systemMessage, userMessage));
 
         logger.info("Asking AI model to reply to question.");
-        AiResponse aiResponse = aiClient.generate(prompt);
+        ChatResponse chatResponse = chatClient.call(prompt);
         logger.info("AI responded.");
-        return aiResponse.getGeneration().getContent();
+        return chatResponse.getResult().getOutput().getContent();
     }
 
     private Message getSystemMessage(String message, boolean stuffit) {
         if (stuffit) {
             logger.info("Retrieving relevant documents");
-            List<Document> similarDocuments = vectorStoreRetriever.retrieve(message);
+            searchRequest.withQuery(message);
+            List<Document> similarDocuments = vectorStore.similaritySearch(searchRequest);
             logger.info(String.format("Found %s relevant documents.", similarDocuments.size()));
             String documents = similarDocuments.stream().map(entry -> entry.getContent()).collect(Collectors.joining("\n"));
             SystemPromptTemplate systemPromptTemplate = new SystemPromptTemplate(this.qaSystemPromptResource);

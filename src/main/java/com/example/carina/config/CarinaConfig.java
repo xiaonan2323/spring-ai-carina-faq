@@ -1,10 +1,8 @@
 package com.example.carina.config;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.embedding.EmbeddingClient;
-import org.springframework.ai.retriever.VectorStoreRetriever;
 import org.springframework.ai.vectorstore.PgVectorStore;
+import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,8 +19,11 @@ public class CarinaConfig {
     }
 
     @Bean
-    public VectorStoreRetriever vectorStoreRetriever(VectorStore vectorStore) {
-        return new VectorStoreRetriever(vectorStore, 4, 0.75);
+    public SearchRequest searchRequest() {
+        SearchRequest searchRequest = SearchRequest.defaults();
+        searchRequest.withTopK(4);
+        searchRequest.withSimilarityThreshold(0.75);
+        return searchRequest;
     }
 
 
